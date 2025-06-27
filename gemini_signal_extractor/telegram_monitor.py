@@ -301,7 +301,8 @@ Text to analyze:
             combined_text = window.get_combined_text()
             prompt = self._build_extraction_prompt(combined_text)
             
-            model = genai.GenerativeModel('gemini-pro')
+            model_name = self.config['gemini'].get('model', 'gemini-1.5-flash')
+            model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
             
             if not response.text:
