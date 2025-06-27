@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Live Telegram Signal Monitoring System
+Enhanced Telegram Signal Monitoring System
 
-A real-time event-driven pipeline that monitors Telegram groups for trading signals,
-processes them through time-based windows, and extracts structured signals using AI.
+A real-time monitoring system that:
+1. Monitors Telegram groups for new messages
+2. Detects direction keywords (buy, sell, long, short)
+3. If message has direction + SL + TP -> sends immediately to AI for parsing
+4. If message has only direction -> opens 2-minute window to collect additional messages
+5. Within window, checks for SL/TP completion and sends to AI when complete
+6. Discards incomplete signals after window expires
+7. Saves all signals to CSV files
 
-Features:
-- Real-time message ingestion with zero data loss
-- Time-based signal windowing (2-minute windows)
-- AI-powered signal extraction using Gemini
-- State persistence and crash recovery
-- Rate limiting and async processing
-- Comprehensive logging and monitoring
+Perfect accuracy in window handling to avoid missing signals.
 """
 
 import os
@@ -22,7 +22,7 @@ import logging
 import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, asdict
 from collections import defaultdict
 import threading
@@ -39,22 +39,9 @@ from telethon.tl.types import PeerChannel
 # AI imports
 import google.generativeai as genai
 
-# Configuration and validation
-VALID_SYMBOLS = [
-    'EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD',
-    'EURJPY', 'GBPJPY', 'EURGBP', 'AUDJPY', 'GBPAUD', 'EURAUD', 'GBPCAD',
-    'XAUUSD', 'XAGUSD', 'BTCUSD', 'ETHUSD', 'US30', 'SPX500', 'NAS100',
-    'GER30', 'UK100', 'JPN225', 'USOIL', 'UKOIL', 'NATGAS'
-]
-
-SIGNAL_KEYWORDS = [
-    'buy', 'sell', 'long', 'short', 'entry', 'tp', 'take profit', 'sl', 
-    'stop loss', 'breakeven', 'be', 'target', 'resistance', 'support'
-]
-
 @dataclass
 class TradingSignal:
-    """Trading signal data structure matching the existing schema"""
+    """Trading signal data structure"""
     group_name: str
     window_id: str
     timestamp: str
@@ -98,8 +85,7 @@ class ConfigManager:
         required_keys = [
             'telegram.api_id', 'telegram.api_hash', 'telegram.phone',
             'telegram.group_ids', 'telegram.groups',
-            'gemini.api_key', 'signal_extraction.time_window_minutes',
-            'data_dir', 'logs_dir'
+            'gemini.api_key', 'signal_extraction.time_window_minutes'
         ]
         
         for key_path in required_keys:
@@ -147,12 +133,13 @@ class StateManager:
                     temp_file.unlink()
 
 class SignalWindow:
-    """Represents a time-based signal window"""
+    """Represents a time-based signal window for collecting messages"""
     
     def __init__(self, window_id: str, trigger_message: Dict, group_name: str, 
                  window_duration: int = 2):
         self.window_id = window_id
         self.group_name = group_name
+        self.trigger_message = trigger_message
         self.start_time = datetime.fromisoformat(trigger_message['timestamp'])
         self.window_duration = timedelta(minutes=window_duration)
         self.end_time = self.start_time + self.window_duration
@@ -160,30 +147,43 @@ class SignalWindow:
         self.is_complete = False
         self.is_expired = False
         self.parsed = False
+        
+        # Check if trigger message is already complete
+        self.is_complete = self._check_completion()
     
     def add_message(self, message: Dict) -> bool:
         """Add message to window if within time bounds"""
+        if self.is_expired or self.is_complete:
+            return False
+            
         msg_time = datetime.fromisoformat(message['timestamp'])
         
-        if msg_time <= self.end_time and not self.is_expired:
+        if msg_time <= self.end_time:
             self.messages.append(message)
+            # Check if window is now complete
+            if self._check_completion():
+                self.is_complete = True
+                logging.info(f"Window {self.window_id} completed with {len(self.messages)} messages")
             return True
         return False
     
-    def check_completion(self) -> bool:
+    def _check_completion(self) -> bool:
         """Check if window contains all required signal components"""
-        if self.is_complete:
-            return True
-        
         combined_text = self.get_combined_text().lower()
         
-        # Check for required components
-        has_direction = any(keyword in combined_text for keyword in ['buy', 'sell', 'long', 'short'])
-        has_sl = 'sl' in combined_text or 'stop loss' in combined_text
-        has_tp = 'tp' in combined_text or 'take profit' in combined_text
+        # Check for direction keywords
+        direction_keywords = ['buy', 'sell', 'long', 'short']
+        has_direction = any(keyword in combined_text for keyword in direction_keywords)
         
-        self.is_complete = has_direction and has_sl and has_tp
-        return self.is_complete
+        # Check for SL keywords
+        sl_keywords = ['sl', 'stop loss', 'stop-loss', 'stoploss']
+        has_sl = any(keyword in combined_text for keyword in sl_keywords)
+        
+        # Check for TP keywords (including tp1, tp2, etc.)
+        tp_keywords = ['tp', 'tp1', 'tp2', 'tp3', 'tp4', 'take profit', 'takeprofit', 'target']
+        has_tp = any(keyword in combined_text for keyword in tp_keywords)
+        
+        return has_direction and has_sl and has_tp
     
     def check_expiry(self) -> bool:
         """Check if window has expired"""
@@ -207,21 +207,6 @@ class SignalWindow:
             'is_expired': self.is_expired,
             'parsed': self.parsed
         }
-    
-    @classmethod
-    def from_dict(cls, data: Dict) -> 'SignalWindow':
-        """Restore window from dictionary"""
-        window = cls.__new__(cls)
-        window.window_id = data['window_id']
-        window.group_name = data['group_name']
-        window.start_time = datetime.fromisoformat(data['start_time'])
-        window.end_time = datetime.fromisoformat(data['end_time'])
-        window.messages = data['messages']
-        window.is_complete = data['is_complete']
-        window.is_expired = data['is_expired']
-        window.parsed = data.get('parsed', False)
-        window.window_duration = window.end_time - window.start_time
-        return window
 
 class GeminiRateLimiter:
     """Rate limiter for Gemini API calls"""
@@ -275,10 +260,12 @@ class SignalParser:
     
     def _build_extraction_prompt(self, text: str) -> str:
         """Build prompt for signal extraction"""
+        valid_symbols = ', '.join(self.config['signal_extraction']['valid_symbols'])
+        
         return f"""
 Extract trading signal information from the following text and return ONLY a valid JSON object.
 
-Valid symbols: {', '.join(VALID_SYMBOLS)}
+Valid symbols: {valid_symbols}
 
 Required JSON format:
 {{
@@ -367,7 +354,8 @@ Text to analyze:
                 return False
         
         # Validate symbol
-        if data['symbol'] not in VALID_SYMBOLS:
+        valid_symbols = self.config['signal_extraction']['valid_symbols']
+        if data['symbol'] not in valid_symbols:
             return False
         
         # Validate direction
@@ -399,52 +387,103 @@ class WindowManager:
         self.active_windows: Dict[str, List[SignalWindow]] = defaultdict(list)
         self.completed_windows: List[SignalWindow] = []
         self._lock = threading.Lock()
+        
+        # Start background cleanup task
+        self._cleanup_task = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self._cleanup_task.start()
     
-    def create_window(self, message: Dict, group_name: str) -> SignalWindow:
-        """Create new signal window"""
-        window_id = f"{group_name}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
-        window = SignalWindow(window_id, message, group_name, self.window_duration)
+    def _has_direction_keyword(self, text: str) -> bool:
+        """Check if text contains direction keywords"""
+        text_lower = text.lower()
+        direction_keywords = ['buy', 'sell', 'long', 'short']
+        return any(keyword in text_lower for keyword in direction_keywords)
+    
+    def _has_sl_keyword(self, text: str) -> bool:
+        """Check if text contains SL keywords"""
+        text_lower = text.lower()
+        sl_keywords = ['sl', 'stop loss', 'stop-loss', 'stoploss']
+        return any(keyword in text_lower for keyword in sl_keywords)
+    
+    def _has_tp_keyword(self, text: str) -> bool:
+        """Check if text contains TP keywords"""
+        text_lower = text.lower()
+        tp_keywords = ['tp', 'tp1', 'tp2', 'tp3', 'tp4', 'take profit', 'takeprofit', 'target']
+        return any(keyword in text_lower for keyword in tp_keywords)
+    
+    def _is_complete_signal(self, text: str) -> bool:
+        """Check if text contains all required signal components"""
+        return (self._has_direction_keyword(text) and 
+                self._has_sl_keyword(text) and 
+                self._has_tp_keyword(text))
+    
+    def process_message(self, message: Dict, group_name: str) -> Optional[SignalWindow]:
+        """Process a new message and return completed window if any"""
+        text = message.get('text', '').strip()
+        if not text:
+            return None
         
         with self._lock:
-            self.active_windows[group_name].append(window)
+            # First, try to add message to existing active windows
+            for window in self.active_windows[group_name][:]:  # Copy list to avoid modification during iteration
+                if not window.is_complete and not window.is_expired:
+                    if window.add_message(message):
+                        if window.is_complete:
+                            # Window completed, move to completed list
+                            self.active_windows[group_name].remove(window)
+                            self.completed_windows.append(window)
+                            logging.info(f"Window {window.window_id} completed with message: {text[:100]}...")
+                            return window
+            
+            # Check if this message should trigger a new window
+            if self._has_direction_keyword(text):
+                # Check if it's already a complete signal
+                if self._is_complete_signal(text):
+                    # Complete signal - create and immediately complete window
+                    window_id = f"{group_name}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+                    window = SignalWindow(window_id, message, group_name, self.window_duration)
+                    window.is_complete = True
+                    self.completed_windows.append(window)
+                    logging.info(f"Complete signal detected, created window {window_id}: {text[:100]}...")
+                    return window
+                else:
+                    # Direction only - create new window for waiting
+                    window_id = f"{group_name}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+                    window = SignalWindow(window_id, message, group_name, self.window_duration)
+                    self.active_windows[group_name].append(window)
+                    logging.info(f"Direction keyword detected, created waiting window {window_id}: {text[:100]}...")
         
-        logging.info(f"Created new window {window_id} for group {group_name}")
-        return window
+        return None
     
-    def add_message_to_windows(self, message: Dict, group_name: str):
-        """Add message to all active windows for group"""
+    def _cleanup_loop(self):
+        """Background cleanup of expired windows"""
+        while True:
+            try:
+                time.sleep(10)  # Check every 10 seconds
+                self._cleanup_expired_windows()
+            except Exception as e:
+                logging.error(f"Error in cleanup loop: {e}")
+    
+    def _cleanup_expired_windows(self):
+        """Remove expired windows that never completed"""
         with self._lock:
-            windows_to_remove = []
-            
-            for window in self.active_windows[group_name]:
-                if window.is_expired or window.is_complete:
-                    continue
+            for group_name in list(self.active_windows.keys()):
+                expired_windows = []
+                for window in self.active_windows[group_name][:]:
+                    if window.check_expiry():
+                        expired_windows.append(window)
+                        self.active_windows[group_name].remove(window)
                 
-                if window.add_message(message):
-                    logging.debug(f"Added message to window {window.window_id}")
-                
-                # Check if window is now complete or expired
-                if window.check_completion() or window.check_expiry():
-                    windows_to_remove.append(window)
-            
-            # Move completed/expired windows
-            for window in windows_to_remove:
-                self.active_windows[group_name].remove(window)
-                self.completed_windows.append(window)
-                
-                if window.is_complete:
-                    logging.info(f"Window {window.window_id} completed with {len(window.messages)} messages")
+                if expired_windows:
+                    logging.info(f"Cleaned up {len(expired_windows)} expired windows for {group_name}")
     
     def get_ready_windows(self) -> List[SignalWindow]:
         """Get windows ready for parsing"""
-        ready = []
-        
         with self._lock:
+            ready = []
             for window in self.completed_windows[:]:
                 if window.is_complete and not window.parsed:
                     ready.append(window)
-        
-        return ready
+            return ready
     
     def mark_window_parsed(self, window_id: str):
         """Mark window as parsed"""
@@ -453,94 +492,99 @@ class WindowManager:
                 if window.window_id == window_id:
                     window.parsed = True
                     break
+
+class SignalOutput:
+    """Handles signal output and CSV management"""
     
-    def cleanup_old_windows(self, max_age_hours: int = 24):
-        """Remove old windows to prevent memory leaks"""
-        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+    def __init__(self, config: Dict):
+        self.config = config
+        self.data_dir = Path(config['paths']['data_dir'])
+        self.signals_dir = self.data_dir / 'signals'
+        self.signals_dir.mkdir(parents=True, exist_ok=True)
         
-        with self._lock:
-            # Clean completed windows
-            self.completed_windows = [
-                w for w in self.completed_windows 
-                if w.start_time > cutoff_time
+        self.final_signals_file = self.signals_dir / 'live_signals.csv'
+        self._ensure_signals_file_exists()
+    
+    def _ensure_signals_file_exists(self):
+        """Create signals CSV file with headers if it doesn't exist"""
+        if not self.final_signals_file.exists():
+            headers = [
+                'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
+                'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
+                'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
             ]
             
-            # Clean active windows (shouldn't happen but safety check)
-            for group_name in self.active_windows:
-                self.active_windows[group_name] = [
-                    w for w in self.active_windows[group_name]
-                    if w.start_time > cutoff_time
-                ]
+            with open(self.final_signals_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
     
-    def get_state(self) -> Dict:
-        """Get current state for persistence"""
-        with self._lock:
-            return {
-                'active_windows': {
-                    group: [w.to_dict() for w in windows]
-                    for group, windows in self.active_windows.items()
-                },
-                'completed_windows': [w.to_dict() for w in self.completed_windows]
-            }
-    
-    def restore_state(self, state: Dict):
-        """Restore state from persistence"""
-        with self._lock:
-            # Restore active windows
-            for group_name, windows_data in state.get('active_windows', {}).items():
-                self.active_windows[group_name] = [
-                    SignalWindow.from_dict(w_data) for w_data in windows_data
-                ]
+    def save_signal(self, signal: TradingSignal):
+        """Save signal to CSV files"""
+        try:
+            # Save to main signals file
+            with open(self.final_signals_file, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                signal_dict = asdict(signal)
+                writer.writerow([signal_dict.get(field, '') for field in [
+                    'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
+                    'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
+                    'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
+                ]])
             
-            # Restore completed windows
-            self.completed_windows = [
-                SignalWindow.from_dict(w_data) 
-                for w_data in state.get('completed_windows', [])
-            ]
+            # Save to group-specific file
+            group_dir = self.data_dir / 'groups' / signal.group_name
+            group_dir.mkdir(parents=True, exist_ok=True)
+            group_signals_file = group_dir / 'live_signals.csv'
+            
+            if not group_signals_file.exists():
+                with open(group_signals_file, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([
+                        'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
+                        'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
+                        'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
+                    ])
+            
+            with open(group_signals_file, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                signal_dict = asdict(signal)
+                writer.writerow([signal_dict.get(field, '') for field in [
+                    'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
+                    'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
+                    'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
+                ]])
+            
+            logging.info(f"Saved signal: {signal.symbol} {signal.direction} from {signal.group_name}")
+            
+        except Exception as e:
+            logging.error(f"Error saving signal: {e}")
 
 class TelegramListener:
     """Real-time Telegram message listener"""
     
     def __init__(self, config: Dict, window_manager: WindowManager, 
+                 signal_parser: SignalParser, signal_output: SignalOutput,
                  state_manager: StateManager):
         self.config = config
         self.window_manager = window_manager
+        self.signal_parser = signal_parser
+        self.signal_output = signal_output
         self.state_manager = state_manager
         self.logger = logging.getLogger(__name__)
         
         # Initialize client
         api_id = config['telegram']['api_id']
         api_hash = config['telegram']['api_hash']
-        self.client = TelegramClient('live_session', api_id, api_hash)
+        self.client = TelegramClient('signal_monitor_session', api_id, api_hash)
         
         self.group_ids = config['telegram']['group_ids']
         self.active_groups = config['telegram']['groups']
         self.last_message_ids = {}
         
         # Data directories
-        self.data_dir = Path(config['data_dir'])
+        self.data_dir = Path(config['paths']['data_dir'])
         self.groups_dir = self.data_dir / 'groups'
         self.groups_dir.mkdir(parents=True, exist_ok=True)
-    
-    def _is_signal_trigger(self, text: str) -> bool:
-        """Check if message contains signal trigger keywords or symbols"""
-        if not text:
-            return False
-        
-        text_lower = text.lower()
-        text_upper = text.upper()
-        
-        # Check for signal keywords
-        for keyword in SIGNAL_KEYWORDS:
-            if keyword in text_lower:
-                return True
-        
-        # Check for valid symbols
-        for symbol in VALID_SYMBOLS:
-            if symbol in text_upper:
-                return True
-        
-        return False
     
     def _save_raw_message(self, message_data: Dict, group_name: str):
         """Save message to raw CSV file"""
@@ -596,13 +640,24 @@ class TelegramListener:
             # Update last message ID
             self.last_message_ids[group_name] = message.id
             
-            # Check if this is a signal trigger
-            if self._is_signal_trigger(message.text):
-                self.window_manager.create_window(message_data, group_name)
-                self.logger.info(f"Signal trigger detected in {group_name}: {message.text[:100]}...")
+            # Process message through window manager
+            completed_window = self.window_manager.process_message(message_data, group_name)
             
-            # Add to existing windows
-            self.window_manager.add_message_to_windows(message_data, group_name)
+            # If window completed, send to AI for parsing
+            if completed_window:
+                try:
+                    signal = await self.signal_parser.parse_signal(completed_window)
+                    if signal:
+                        self.signal_output.save_signal(signal)
+                        self.logger.info(f"Parsed and saved signal from window {completed_window.window_id}")
+                    else:
+                        self.logger.warning(f"Failed to parse signal from window {completed_window.window_id}")
+                    
+                    # Mark window as parsed
+                    self.window_manager.mark_window_parsed(completed_window.window_id)
+                    
+                except Exception as e:
+                    self.logger.error(f"Error parsing signal from window {completed_window.window_id}: {e}")
             
         except Exception as e:
             self.logger.error(f"Error handling message: {e}")
@@ -626,129 +681,51 @@ class TelegramListener:
         for group_name in self.active_groups:
             if group_name in self.group_ids:
                 chat_id = self.group_ids[group_name]
-                entity = await self.client.get_entity(chat_id)
-                chat_entities.append(entity)
+                try:
+                    entity = await self.client.get_entity(chat_id)
+                    chat_entities.append(entity)
+                    self.logger.info(f"Added group {group_name} to monitoring")
+                except Exception as e:
+                    self.logger.error(f"Failed to get entity for group {group_name}: {e}")
+        
+        if not chat_entities:
+            self.logger.error("No chat entities found. Cannot start monitoring.")
+            return
         
         # Register event handler
         @self.client.on(events.NewMessage(chats=chat_entities, incoming=True))
         async def message_handler(event):
             await self._handle_new_message(event)
         
-        self.logger.info(f"Started listening to {len(chat_entities)} groups")
+        self.logger.info(f"Started listening to {len(chat_entities)} groups: {self.active_groups}")
+        
+        # Start background processing of any missed completed windows
+        asyncio.create_task(self._background_processor())
         
         # Keep running
         await self.client.run_until_disconnected()
     
-    async def catch_up_history(self):
-        """Catch up on missed messages since last run"""
-        state = self.state_manager.load_state()
-        
-        for group_name in self.active_groups:
-            if group_name not in self.group_ids:
-                continue
-            
-            last_id = state.get('groups', {}).get(group_name, {}).get('last_message_id', 0)
-            chat_id = self.group_ids[group_name]
-            
+    async def _background_processor(self):
+        """Process any completed windows that haven't been parsed yet"""
+        while True:
             try:
-                entity = await self.client.get_entity(chat_id)
+                await asyncio.sleep(5)  # Check every 5 seconds
                 
-                # Get latest messages
-                messages = await self.client.get_messages(entity, limit=100)
-                
-                new_messages = []
-                for msg in reversed(messages):
-                    if msg.id > last_id and msg.text:
-                        new_messages.append(msg)
-                
-                self.logger.info(f"Catching up {len(new_messages)} messages for {group_name}")
-                
-                # Process new messages
-                for msg in new_messages:
-                    message_data = {
-                        'message_id': msg.id,
-                        'timestamp': msg.date.isoformat(),
-                        'text': msg.text,
-                        'group_name': group_name
-                    }
-                    
-                    self._save_raw_message(message_data, group_name)
-                    
-                    if self._is_signal_trigger(msg.text):
-                        self.window_manager.create_window(message_data, group_name)
-                    
-                    self.window_manager.add_message_to_windows(message_data, group_name)
-                    
-                    self.last_message_ids[group_name] = msg.id
-                
+                ready_windows = self.window_manager.get_ready_windows()
+                for window in ready_windows:
+                    try:
+                        signal = await self.signal_parser.parse_signal(window)
+                        if signal:
+                            self.signal_output.save_signal(signal)
+                            self.logger.info(f"Background processed signal from window {window.window_id}")
+                        
+                        self.window_manager.mark_window_parsed(window.window_id)
+                        
+                    except Exception as e:
+                        self.logger.error(f"Error in background processing window {window.window_id}: {e}")
+                        
             except Exception as e:
-                self.logger.error(f"Error catching up history for {group_name}: {e}")
-
-class SignalOutput:
-    """Handles signal output and CSV management"""
-    
-    def __init__(self, config: Dict):
-        self.config = config
-        self.data_dir = Path(config['data_dir'])
-        self.signals_dir = self.data_dir / 'final_signals'
-        self.signals_dir.mkdir(parents=True, exist_ok=True)
-        
-        self.final_signals_file = self.signals_dir / 'all_signals.csv'
-        self._ensure_signals_file_exists()
-    
-    def _ensure_signals_file_exists(self):
-        """Create signals CSV file with headers if it doesn't exist"""
-        if not self.final_signals_file.exists():
-            headers = [
-                'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
-                'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
-                'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
-            ]
-            
-            with open(self.final_signals_file, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(headers)
-    
-    def save_signal(self, signal: TradingSignal):
-        """Save signal to CSV files"""
-        try:
-            # Save to final signals file
-            with open(self.final_signals_file, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                signal_dict = asdict(signal)
-                writer.writerow([signal_dict.get(field, '') for field in [
-                    'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
-                    'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
-                    'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
-                ]])
-            
-            # Save to group-specific file
-            group_dir = self.data_dir / 'groups' / signal.group_name
-            group_dir.mkdir(parents=True, exist_ok=True)
-            group_signals_file = group_dir / 'signals.csv'
-            
-            if not group_signals_file.exists():
-                with open(group_signals_file, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([
-                        'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
-                        'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
-                        'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
-                    ])
-            
-            with open(group_signals_file, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                signal_dict = asdict(signal)
-                writer.writerow([signal_dict.get(field, '') for field in [
-                    'group_name', 'window_id', 'timestamp', 'symbol', 'direction',
-                    'entry', 'sl', 'tp1', 'tp2', 'tp3', 'tp4', 'confidence',
-                    'valid', 'corrections', 'validation_notes', 'context', 'raw_text'
-                ]])
-            
-            logging.info(f"Saved signal: {signal.symbol} {signal.direction} from {signal.group_name}")
-            
-        except Exception as e:
-            logging.error(f"Error saving signal: {e}")
+                self.logger.error(f"Error in background processor: {e}")
 
 class LiveTelegramMonitor:
     """Main monitoring system coordinator"""
@@ -763,4 +740,86 @@ class LiveTelegramMonitor:
         self.logger = logging.getLogger(__name__)
         
         # Initialize components
-        self.state_manager = State
+        self.state_manager = StateManager(Path(self.config['paths']['data_dir']))
+        self.window_manager = WindowManager(
+            self.config['signal_extraction']['time_window_minutes']
+        )
+        self.signal_parser = SignalParser(self.config)
+        self.signal_output = SignalOutput(self.config)
+        self.telegram_listener = TelegramListener(
+            self.config, 
+            self.window_manager, 
+            self.signal_parser, 
+            self.signal_output,
+            self.state_manager
+        )
+        
+        self.logger.info("LiveTelegramMonitor initialized successfully")
+    
+    def _setup_logging(self):
+        """Setup logging configuration"""
+        logging_config = self.config.get('logging', {})
+        
+        # Create logs directory
+        logs_dir = Path(self.config['paths']['logs_dir'])
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Setup logging
+        log_level = getattr(logging, logging_config.get('level', 'INFO').upper())
+        log_format = logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        log_file = logs_dir / logging_config.get('file', 'telegram_monitor.log')
+        
+        # Configure logging
+        logging.basicConfig(
+            level=log_level,
+            format=log_format,
+            handlers=[
+                logging.FileHandler(log_file, encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
+        
+        # Set third-party loggers to WARNING to reduce noise
+        logging.getLogger('telethon').setLevel(logging.WARNING)
+        logging.getLogger('asyncio').setLevel(logging.WARNING)
+    
+    async def start(self):
+        """Start the monitoring system"""
+        try:
+            self.logger.info("Starting Telegram Signal Monitor...")
+            
+            # Connect to Telegram
+            await self.telegram_listener.connect()
+            
+            # Start listening
+            await self.telegram_listener.start_listening()
+            
+        except KeyboardInterrupt:
+            self.logger.info("Monitoring stopped by user")
+        except Exception as e:
+            self.logger.error(f"Error in monitoring system: {e}")
+            raise
+    
+    def run(self):
+        """Run the monitoring system"""
+        try:
+            asyncio.run(self.start())
+        except KeyboardInterrupt:
+            self.logger.info("Monitoring stopped by user")
+        except Exception as e:
+            self.logger.error(f"Fatal error: {e}")
+            raise
+
+async def main():
+    """Main entry point"""
+    monitor = LiveTelegramMonitor()
+    await monitor.start()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nMonitoring stopped by user")
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        logging.error(f"Fatal error: {e}")
