@@ -252,7 +252,8 @@ class SignalParser:
         
         # Test connection
         try:
-            model = genai.GenerativeModel('gemini-pro')
+            model_name = self.config['gemini'].get('model', 'gemini-1.5-flash')
+            model = genai.GenerativeModel(model_name)
             response = model.generate_content("Hello")
             logging.info("Gemini AI connection verified")
         except Exception as e:
