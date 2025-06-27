@@ -1,0 +1,13 @@
+pandas>=1.5.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+telethon>=1.28.0
+google-generativeai>=0.3.0
+python-telegram-bot>=20.0
+loguru>=0.7.0
+
+# Development & Quality Tools
+pytest>=7.0.0
+# black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0

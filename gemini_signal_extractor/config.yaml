@@ -1,0 +1,223 @@
+# config.yaml
+
+paths:
+  # Base directory for all data files
+  data_dir: "data"
+
+  # Directory for log files
+  logs_dir: "logs"
+
+  # Directory where raw “windows” CSVs live (one file per group)
+  # {group_name} will be replaced at runtime
+  windows_dir: "data/groups/{group_name}/windows.csv"
+
+  # Directory/template for per-group signals output
+  signals_dir: "data/groups/{group_name}/signals.csv"
+
+  # The combined CSV of all signals across all groups
+  final_signals_file: "data/final_signals.csv"
+
+logging:
+  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  # Log format string (Python logging.Formatter)
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  # Path to the log file (relative or absolute)
+  file: "logs/live_monitor.log"
+  # Optional rotating file settings
+  max_file_size: "50MB"
+  backup_count: 5
+
+telegram:
+  # Telegram API credentials
+  api_id: 27346681
+  api_hash: "4e720e2c4446243f58c564dfccf07847"
+  phone: "+254745026933"
+
+  # Group IDs mapping
+  group_ids:
+    XAUUSD_FOREX_SIGNALS: -1001783411198
+    GOLD_PERFECT_SIGNAL:   -1001950730170
+    SNIPER_FX_SIGNAL:      -1002062660533
+    EXNESS_TRADE_OFFICIAL: -1002315820657
+    TURBO_TRADERS:         -1002153721185
+    LONDON_TRADING_SESSION: -1001986433833
+    UK_GOLD_EXPERT:        -1001890936375
+    FOREX_SIGNALS_COM:     -1001577591378
+    FOREX_SIGNAL_CLUB:     -1001871729749
+    GOLD_TRADR:            -1002553439892
+    VIP_FOREX_PIPS:        -1001527350076
+    OLADO_FOREX_ACADEMY:   -1001842858272
+    FX_PRO:                -1001232720618
+    MWABU_FX_SNIPER:       -1001833938886
+
+  # Active groups to monitor (subset of group_ids)
+  groups:
+    # - XAUUSD_FOREX_SIGNALS
+    - GOLD_PERFECT_SIGNAL
+    - SNIPER_FX_SIGNAL
+    # add or uncomment others as needed
+
+gemini:
+  api_key: "AIzaSyBukdbKHx-tgNEXHnMl7Zo8lztEhK9g2G8"
+  model: "models/gemini-1.5-flash"
+  temperature: 0.2
+  max_tokens: 1024
+  max_retries: 3
+  retry_delay: 60
+  max_requests_per_minute: 12
+  timeout: 30
+
+rate_limiting:
+  max_requests_per_minute: 60
+  burst: 10
+
+# New progress block for the SignalParser
+progress:
+  # Where to persist parsing progress state
+  state_file: "data/processing_state.json"
+  # Skip groups already marked complete
+  skip_completed_groups: true
+  # Number of windows to batch before saving
+  batch_size: 5
+
+batching:
+  sleep_between_batches: 2  # seconds
+
+signal_extraction:
+  # Time window for signal collection (in minutes)
+  time_window_minutes: 2
+
+  # Valid trading symbols
+  valid_symbols:
+    - EURUSD
+    - GBPUSD
+    - USDJPY
+    - USDCHF
+    - AUDUSD
+    - USDCAD
+    - NZDUSD
+    - EURJPY
+    - GBPJPY
+    - EURGBP
+    - AUDJPY
+    - GBPAUD
+    - EURAUD
+    - GBPCAD
+    - XAUUSD
+    - XAGUSD
+    - BTCUSD
+    - ETHUSD
+    - US30
+    - SPX500
+    - NAS100
+    - GER30
+    - UK100
+    - JPN225
+    - USOIL
+    - UKOIL
+    - NATGAS
+    - GOLD
+    - XAU/USD
+    - GOLD/USD
+
+  # Keywords used to detect a signal in text
+  signal_keywords:
+    - buy
+    - sell
+    - long
+    - short
+    - entry
+    - tp
+    - take profit
+    - sl
+    - stop loss
+    - breakeven
+    - be
+    - target
+    - resistance
+    - support
+
+  # Minimum confidence threshold for acceptance
+  min_confidence: 0.5
+
+  # Completion requirements for a valid signal
+  completion_requirements:
+    direction_keywords: ["buy", "sell", "long", "short"]
+    sl_keywords:        ["sl", "stop loss", "stop-loss"]
+    tp_keywords:        ["tp", "take profit", "target"]
+
+  # Price validation settings
+  price_validation:
+    max_tp_distance: 100    # Maximum pips between entry and TP
+    max_sl_distance: 50     # Maximum pips between entry and SL
+    min_risk_reward: 0.5    # Minimum risk:reward ratio
+
+  # SL/TP regex patterns for flexible signal detection
+  patterns:
+    sl:
+      - "\\bsl\\b"
+      - "\\bstoploss\\b"
+      - "\\bstop-loss\\b"
+      - "\\bstop\\s+loss\\b"
+      - "\\bstop\\s*:\\s*\\d+"
+      - "\\bsl\\s*:\\s*\\d+"
+    tp:
+      - "\\btp\\b"
+      - "\\btp1\\b"
+      - "\\btp2\\b"
+      - "\\btp3\\b"
+      - "\\btp4\\b"
+      - "\\btakeprofit\\b"
+      - "\\btake-profit\\b"
+      - "\\btake\\s+profit\\b"
+      - "\\btarget\\b"
+      - "\\btp\\s*:\\s*\\d+"
+      - "\\btarget\\s*:\\s*\\d+"
+
+state_management:
+  # Where to persist your monitoring state
+  state_file: "data/monitor_state.json"
+  backup_frequency: 300           # seconds between automatic backups
+  max_window_age_hours: 24        # clean up old windows
+  max_completed_windows: 1000     # retain recent completed windows
+
+performance:
+  parse_in_background: true
+  max_concurrent_parses: 3
+  cleanup_interval_minutes: 60
+  max_active_windows_per_group: 50
+  max_consecutive_errors: 5
+  error_cooldown_seconds: 300
+  rate_limit_buffer: 0.8
+
+output:
+  csv_encoding: "utf-8"
+  include_headers: true
+  timestamp_format: "%Y-%m-%d %H:%M:%S"
+  separate_group_files: true
+  compress_old_files: false
+  signal_fields:
+    - group_name
+    - window_id
+    - timestamp
+    - symbol
+    - direction
+    - entry
+    - sl
+    - tp1
+    - tp2
+    - tp3
+    - tp4
+    - confidence
+    - valid
+    - corrections
+    - validation_notes
+    - context
+    - raw_text
+
+debug:
+  save_raw_messages: true
+  log_window_lifecycle: true
+  log_ai_responses: false
+  test_mode: false

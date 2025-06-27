@@ -1,0 +1,26 @@
+2025-06-27 20:39:31,243 - __main__ - INFO - Created/verified directories: ['C:\\Users\\PC\\OneDrive\\Desktop\\python\\Gemini extractor\\gemini_signal_extractor\\data', 'logs', 'C:\\Users\\PC\\OneDrive\\Desktop\\python\\Gemini extractor\\gemini_signal_extractor\\data\\groups', 'C:\\Users\\PC\\OneDrive\\Desktop\\python\\Gemini extractor\\gemini_signal_extractor\\data\\final_signals']
+2025-06-27 20:39:31,244 - __main__ - INFO - Initialized with time_window_minutes=2
+2025-06-27 20:39:31,244 - __main__ - INFO - Active groups: ['GOLD_PERFECT_SIGNAL', 'SNIPER_FX_SIGNAL']
+2025-06-27 20:39:31,245 - __main__ - INFO - Starting to process 2 groups
+2025-06-27 20:39:31,246 - __main__ - WARNING - Group directory not found: C:\Users\PC\OneDrive\Desktop\python\Gemini extractor\gemini_signal_extractor\data\groups\GOLD_PERFECT_SIGNAL. Skipping.
+2025-06-27 20:39:31,246 - __main__ - WARNING - Group directory not found: C:\Users\PC\OneDrive\Desktop\python\Gemini extractor\gemini_signal_extractor\data\groups\SNIPER_FX_SIGNAL. Skipping.
+2025-06-27 20:39:31,246 - __main__ - INFO - Processing complete. Success: 0, Failed: 2
+2025-06-27 20:41:56,909 - __main__ - INFO - Created/verified directories: ['C:\\Users\\PC\\OneDrive\\Desktop\\python\\gemini_signal_extractor\\data', 'logs', 'C:\\Users\\PC\\OneDrive\\Desktop\\python\\gemini_signal_extractor\\data\\groups', 'C:\\Users\\PC\\OneDrive\\Desktop\\python\\gemini_signal_extractor\\data\\final_signals']
+2025-06-27 20:41:56,909 - __main__ - INFO - Initialized with time_window_minutes=2
+2025-06-27 20:41:56,910 - __main__ - INFO - Active groups: ['GOLD_PERFECT_SIGNAL', 'SNIPER_FX_SIGNAL']
+2025-06-27 20:41:56,910 - __main__ - INFO - Starting to process 2 groups
+2025-06-27 20:41:56,910 - __main__ - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 20:41:56,982 - __main__ - INFO - Loaded 5678 messages from C:\Users\PC\OneDrive\Desktop\python\gemini_signal_extractor\data\groups\GOLD_PERFECT_SIGNAL\raw_messages.csv
+2025-06-27 20:41:57,315 - __main__ - INFO - Converted 5678 messages to dictionary format
+2025-06-27 20:41:57,316 - __main__ - INFO - Creating time-based windows from 5678 messages with time_window=2 minutes
+2025-06-27 20:42:06,990 - __main__ - INFO - Created 2035 time-based windows
+2025-06-27 20:42:06,991 - __main__ - INFO - Window quality distribution: {'high': 1039, 'medium': 758, 'low': 238}
+2025-06-27 20:42:07,024 - __main__ - INFO - Saved 2035 windows to C:\Users\PC\OneDrive\Desktop\python\gemini_signal_extractor\data\groups\GOLD_PERFECT_SIGNAL\windows.csv
+2025-06-27 20:42:07,031 - __main__ - INFO - Processing group: SNIPER_FX_SIGNAL
+2025-06-27 20:42:07,086 - __main__ - INFO - Loaded 8138 messages from C:\Users\PC\OneDrive\Desktop\python\gemini_signal_extractor\data\groups\SNIPER_FX_SIGNAL\raw_messages.csv
+2025-06-27 20:42:07,628 - __main__ - INFO - Converted 8138 messages to dictionary format
+2025-06-27 20:42:07,628 - __main__ - INFO - Creating time-based windows from 8138 messages with time_window=2 minutes
+2025-06-27 20:42:18,656 - __main__ - INFO - Created 2313 time-based windows
+2025-06-27 20:42:18,658 - __main__ - INFO - Window quality distribution: {'low': 1441, 'high': 542, 'medium': 330}
+2025-06-27 20:42:18,720 - __main__ - INFO - Saved 2313 windows to C:\Users\PC\OneDrive\Desktop\python\gemini_signal_extractor\data\groups\SNIPER_FX_SIGNAL\windows.csv
+2025-06-27 20:42:18,723 - __main__ - INFO - Processing complete. Success: 2, Failed: 0

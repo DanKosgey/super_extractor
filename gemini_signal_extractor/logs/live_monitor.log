@@ -1,0 +1,50 @@
+2025-06-24 18:04:14,787 - SignalParser - ERROR - Failed to initialize Gemini API: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-24 18:06:41,851 - SignalParser - ERROR - Failed to initialize Gemini API: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-24 18:08:11,351 - SignalParser - ERROR - Failed to initialize Gemini API: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-24 18:09:23,623 - SignalParser - ERROR - Failed to initialize Gemini API: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-24 18:10:49,584 - SignalParser - ERROR - Failed to initialize Gemini API: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-24 18:11:28,072 - SignalParser - ERROR - Failed to initialize Gemini API: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-25 09:09:24,239 - SignalParser - ERROR - Windows file not found: C:/Users/PC/OneDrive/Desktop/python/Gemini extractor/data/GOLD_PERFECT_SIGNAL/windows.csv
+2025-06-25 09:09:43,076 - SignalParser - ERROR - Windows file not found: C:/Users/PC/OneDrive/Desktop/python/Gemini extractor/data/GOLD_PERFECT_SIGNAL/windows.csv
+2025-06-25 09:10:54,671 - SignalParser - ERROR - Windows file not found: C:/Users/PC/OneDrive/Desktop/python/Gemini extractor/data/GOLD_PERFECT_SIGNAL/windows.csv
+2025-06-25 09:15:20,575 - SignalParser - INFO - Processing 2125 messages from group GOLD_PERFECT_SIGNAL
+2025-06-25 09:15:20,580 - SignalParser - ERROR - Error processing group GOLD_PERFECT_SIGNAL: 'text'
+2025-06-25 09:19:56,002 - SignalParser - INFO - Processing 2125 messages from group GOLD_PERFECT_SIGNAL
+2025-06-25 09:19:56,002 - SignalParser - ERROR - Error processing group GOLD_PERFECT_SIGNAL: 'text'
+2025-06-25 09:20:04,929 - SignalParser - INFO - Processing 2125 messages from group GOLD_PERFECT_SIGNAL
+2025-06-25 09:20:04,944 - SignalParser - ERROR - Error processing group GOLD_PERFECT_SIGNAL: 'text'
+2025-06-27 12:16:51,059 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 12:16:51,105 - SignalParser - INFO - Loaded 2125 windows for group GOLD_PERFECT_SIGNAL
+2025-06-27 12:16:53,230 - SignalParser - ERROR - Gemini API error: 404 models/gemini-1.0-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-27 12:16:53,230 - SignalParser - WARNING - Empty response from Gemini for window 0
+2025-06-27 12:16:54,988 - SignalParser - ERROR - Gemini API error: 404 models/gemini-1.0-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-27 12:16:54,988 - SignalParser - WARNING - Empty response from Gemini for window 1
+2025-06-27 12:16:56,157 - SignalParser - ERROR - Gemini API error: 404 models/gemini-1.0-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2025-06-27 12:16:56,158 - SignalParser - WARNING - Empty response from Gemini for window 2
+2025-06-27 12:16:56,639 - SignalParser - INFO - Completed processing group GOLD_PERFECT_SIGNAL - Processed: 620, Skipped: 1505, Signals: 0, Valid: 0
+2025-06-27 12:18:23,962 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 12:18:23,963 - SignalParser - INFO - Skipping completed group: GOLD_PERFECT_SIGNAL
+2025-06-27 12:18:44,143 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 12:18:44,163 - SignalParser - INFO - Loaded 2125 windows for group GOLD_PERFECT_SIGNAL
+2025-06-27 12:18:44,165 - SignalParser - ERROR - Gemini API error: 'str' object has no attribute 'generate_content'
+2025-06-27 12:18:44,165 - SignalParser - WARNING - Empty response from Gemini for window 0
+2025-06-27 12:18:45,167 - SignalParser - ERROR - Gemini API error: 'str' object has no attribute 'generate_content'
+2025-06-27 12:18:45,168 - SignalParser - WARNING - Empty response from Gemini for window 1
+2025-06-27 12:18:46,169 - SignalParser - ERROR - Gemini API error: 'str' object has no attribute 'generate_content'
+2025-06-27 12:18:46,170 - SignalParser - WARNING - Empty response from Gemini for window 2
+2025-06-27 12:18:47,171 - SignalParser - ERROR - Gemini API error: 'str' object has no attribute 'generate_content'
+2025-06-27 12:18:47,172 - SignalParser - WARNING - Empty response from Gemini for window 3
+2025-06-27 12:18:48,173 - SignalParser - ERROR - Gemini API error: 'str' object has no attribute 'generate_content'
+2025-06-27 12:18:48,174 - SignalParser - WARNING - Empty response from Gemini for window 4
+2025-06-27 12:18:48,183 - SignalParser - INFO - Completed processing group GOLD_PERFECT_SIGNAL - Processed: 620, Skipped: 1505, Signals: 0, Valid: 0
+2025-06-27 16:03:30,174 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:03:30,175 - SignalParser - ERROR - Windows file not found: C:\Users\PC\OneDrive\Desktop\python\Gemini extractor\gemini_signal_extractor\data\groups\GOLD_PERFECT_SIGNAL\windows.csv
+2025-06-27 16:03:30,181 - SignalParser - WARNING - No windows data found for group GOLD_PERFECT_SIGNAL
+2025-06-27 16:07:37,177 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:07:37,178 - SignalParser - INFO - Skipping completed group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:11:37,037 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:11:37,038 - SignalParser - INFO - Skipping completed group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:12:13,701 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:12:13,701 - SignalParser - INFO - Skipping completed group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:12:56,213 - SignalParser - INFO - Processing group: GOLD_PERFECT_SIGNAL
+2025-06-27 16:12:56,214 - SignalParser - INFO - Skipping completed group: GOLD_PERFECT_SIGNAL
