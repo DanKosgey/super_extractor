@@ -761,17 +761,20 @@ class LiveTelegramMonitor:
     def _setup_logging(self):
         """Setup logging configuration"""
         logging_config = self.config.get('logging', {})
-        
-        # Create logs directory
-        logs_dir = Path(self.config['paths']['logs_dir'])
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        # Create logs directory if log file is in a subdirectory, else ensure cwd exists
+        log_file_name = logging_config.get('file', 'telegram_monitor.log')
+        log_file_path = Path(log_file_name)
+        if log_file_path.parent != Path('.'):
+            log_dir = log_file_path.parent
+            log_dir.mkdir(parents=True, exist_ok=True)
+        # If log_file is just a filename, no directory creation needed
+
         # Setup logging
         log_level = getattr(logging, logging_config.get('level', 'INFO').upper())
         log_format = logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        log_file = logs_dir / logging_config.get('file', 'telegram_monitor.log')
-        
-        # Configure logging
+        log_file = log_file_path
+
         logging.basicConfig(
             level=log_level,
             format=log_format,
@@ -780,7 +783,7 @@ class LiveTelegramMonitor:
                 logging.StreamHandler()
             ]
         )
-        
+
         # Set third-party loggers to WARNING to reduce noise
         logging.getLogger('telethon').setLevel(logging.WARNING)
         logging.getLogger('asyncio').setLevel(logging.WARNING)
