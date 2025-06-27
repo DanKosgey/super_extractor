@@ -1,0 +1,2 @@
+group_name,window_id,timestamp,symbol,direction,entry,sl,tp1,tp2,tp3,tp4,confidence,valid,corrections,validation_notes,context,raw_text
+GOLD_PERFECT_SIGNAL,GOLD_PERFECT_SIGNAL_1751054020_da19f83e,2025-06-27T19:53:40.503042,XAUUSD,BUY,1950.5,1945.0,1960.0,1970.0,,,0.85,True,,,"Window: GOLD_PERFECT_SIGNAL_1751054020_da19f83e, Messages: 1","BUY XAUUSD at 1950.50, SL: 1945.00, TP1: 1960.00, TP2: 1970.00"
